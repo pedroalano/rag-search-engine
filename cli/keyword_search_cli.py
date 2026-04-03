@@ -1,6 +1,8 @@
 import argparse
 import json
+from nltk.stem import PorterStemmer
 from helpers import is_match, load_stopwords
+from inverted_index import InvertedIndex
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -9,6 +11,7 @@ def main() -> None:
     search_parser = subparsers.add_parser("search", help="Search movies using BM25")
     search_parser.add_argument("query", type=str, help="Search query")
 
+    build_parser = subparsers.add_parser("build", help="Build inverted index")
     args = parser.parse_args()
 
     stopwords = load_stopwords()
@@ -33,6 +36,17 @@ def main() -> None:
             print(f"Searching for: {args.query}")
             for i, movie in enumerate(results, start=1):
                 print(f"{i}. {movie['title']}")
+        case "build":
+            stopwords = load_stopwords()
+            stemmer = PorterStemmer()
+
+            index = InvertedIndex(stopwords, stemmer)
+            index.build(data["movies"])
+            index.save()
+
+            docs = index.get_documents("merida")
+
+            print(f"First document for token 'merida' = {docs[0]}")
 
         case _:
             parser.print_help()
