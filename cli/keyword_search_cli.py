@@ -1,6 +1,6 @@
 import argparse
 import json
-from helpers import is_match
+from helpers import is_match, load_stopwords
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -10,6 +10,8 @@ def main() -> None:
     search_parser.add_argument("query", type=str, help="Search query")
 
     args = parser.parse_args()
+
+    stopwords = load_stopwords()
 
     # ✅ load JSON file correctly
     with open("./data/movies.json", "r", encoding="utf-8") as f:
@@ -21,7 +23,7 @@ def main() -> None:
 
             # iterate over movies
             for movie in data["movies"]:
-                if is_match(args.query, movie["title"]):
+                if is_match(args.query, movie["title"],stopwords):
                     results.append(movie)
 
             # limit to 5 results (already sorted by ID)
