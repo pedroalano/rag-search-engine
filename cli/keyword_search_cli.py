@@ -12,6 +12,11 @@ def main() -> None:
     search_parser.add_argument("query", type=str, help="Search query")
 
     build_parser = subparsers.add_parser("build", help="Build inverted index")
+
+    tf_parser = subparsers.add_parser("tf", help="Get term frequency")
+    tf_parser.add_argument("doc_id", type=int)
+    tf_parser.add_argument("term", type=str)
+
     args = parser.parse_args()
 
     stopwords = load_stopwords()
@@ -53,6 +58,20 @@ def main() -> None:
             for i, doc_id in enumerate(results, start=1):
                 movie = index.docmap[doc_id]
                 print(f"{i}. {movie['title']}")
+        case "tf":
+            stopwords = load_stopwords()
+            stemmer = PorterStemmer()
+
+            index = InvertedIndex(stopwords, stemmer)
+
+            try:
+             index.load()
+            except FileNotFoundError as e:
+             print(str(e))
+             return
+
+            tf = index.get_tf(args.doc_id, args.term)
+            print(tf)
         case "build":
             stopwords = load_stopwords()
             stemmer = PorterStemmer()

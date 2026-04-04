@@ -1,10 +1,12 @@
 import pickle
 from pathlib import Path
+from collections import Counter
 
 class InvertedIndex:
     def __init__(self, stopwords: set[str], stemmer):
         self.index: dict[str, set[int]] = {}
         self.docmap: dict[int, dict] = {}
+        self.term_frequencies: dict[int, Counter] = {}
         self.stopwords = stopwords
         self.stemmer = stemmer
 
@@ -29,11 +31,15 @@ class InvertedIndex:
     def _add_document(self, doc_id: int, text: str):
         tokens = self._tokenize(text)
 
+        self.term_frequencies[doc_id] = Counter()
+
         for token in tokens:
             if token not in self.index:
                 self.index[token] = set()
 
             self.index[token].add(doc_id)
+
+            self.term_frequencies[doc_id][token] += 1
 
     def get_documents(self, term: str) -> list[int]:
         term = self.stemmer.stem(term.lower())
@@ -60,11 +66,15 @@ class InvertedIndex:
         with open(cache_dir / "docmap.pkl", "wb") as f:
             pickle.dump(self.docmap, f)
 
+        with open(cache_dir / "term_frequencies.pkl", "wb") as f:
+            pickle.dump(self.term_frequencies, f)
+
     def load(self):
         cache_dir = Path("cache")
 
         index_path = cache_dir / "index.pkl"
         docmap_path = cache_dir / "docmap.pkl"
+        tf_path = cache_dir / "term_frequencies.pkl"
 
         if not index_path.exists() or not docmap_path.exists():
             raise FileNotFoundError("Index files not found. Please run build first.")
@@ -74,3 +84,16 @@ class InvertedIndex:
 
         with open(docmap_path, "rb") as f:
             self.docmap = pickle.load(f)
+
+        with open(tf_path, "rb") as f:
+            self.term_frequencies = pickle.load(f)
+
+    def get_tf(self, doc_id: int, term: str) -> int:
+        tokens = self._tokenize(term)
+
+        if len(tokens) != 1:
+            raise ValueError("Term must be a single token")
+
+        token = tokens[0]
+
+        return self.term_frequencies.get(doc_id, {}).get(token, 0)
