@@ -22,19 +22,36 @@ def main() -> None:
 
     match args.command:
         case "search":
+            stopwords = load_stopwords()
+            stemmer = PorterStemmer()
+
+            index = InvertedIndex(stopwords, stemmer)
+
+            try:
+                index.load()
+            except FileNotFoundError as e:
+                print(str(e)) 
+                return
+
+            query_tokens = index._tokenize(args.query)
+
             results = []
+            seen = set()
 
-            # iterate over movies
-            for movie in data["movies"]:
-                if is_match(args.query, movie["title"],stopwords):
-                    results.append(movie)
+            for token in query_tokens:
+                doc_ids = index.get_documents(token)
 
-            # limit to 5 results (already sorted by ID)
-            results = results[:5]
+                for doc_id in doc_ids:
+                    if doc_id not in seen:
+                        results.append(doc_id)
+                        seen.add(doc_id)
 
-            # print output
+                    if len(results) >= 5:
+                        break
+
             print(f"Searching for: {args.query}")
-            for i, movie in enumerate(results, start=1):
+            for i, doc_id in enumerate(results, start=1):
+                movie = index.docmap[doc_id]
                 print(f"{i}. {movie['title']}")
         case "build":
             stopwords = load_stopwords()
@@ -44,10 +61,7 @@ def main() -> None:
             index.build(data["movies"])
             index.save()
 
-            docs = index.get_documents("merida")
-
-            print(f"First document for token 'merida' = {docs[0]}")
-
+            print("Index build and saved successfully.")
         case _:
             parser.print_help()
 
