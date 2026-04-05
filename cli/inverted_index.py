@@ -1,6 +1,8 @@
 import pickle
 from pathlib import Path
 from collections import Counter
+import math
+
 
 class InvertedIndex:
     def __init__(self, stopwords: set[str], stemmer):
@@ -10,8 +12,7 @@ class InvertedIndex:
         self.stopwords = stopwords
         self.stemmer = stemmer
 
-
-    def _tokenize(self, text:str) -> list[str]:
+    def _tokenize(self, text: str) -> list[str]:
         import string
 
         translator = str.maketrans("", "", string.punctuation)
@@ -19,10 +20,7 @@ class InvertedIndex:
 
         tokens = text.split()
 
-        tokens = [
-            t for t in tokens
-            if t and t not in self.stopwords
-        ]
+        tokens = [t for t in tokens if t and t not in self.stopwords]
 
         tokens = [self.stemmer.stem(t) for t in tokens]
 
@@ -97,3 +95,16 @@ class InvertedIndex:
         token = tokens[0]
 
         return self.term_frequencies.get(doc_id, {}).get(token, 0)
+
+    def get_bm25_idf(self, term: str) -> float:
+        tokens = self._tokenize(term)
+
+        if len(tokens) != 1:
+            raise ValueError("Term must be a single token")
+
+        token = tokens[0]
+
+        N = len(self.docmap)  # total docs
+        df = len(self.index.get(token, set()))  # docs com o termo
+
+        return math.log((N - df + 0.5) / (df + 0.5) + 1)

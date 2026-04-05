@@ -1,29 +1,30 @@
 import string
 from pathlib import Path
 from nltk.stem import PorterStemmer
+from inverted_index import InvertedIndex
 
 STOPWORDS = {"a", "an", "the", "of", "on", "in", "to", "and"}
 
 stemmer = PorterStemmer()
 
+
 def normalize(text: str) -> str:
-    translator = str.maketrans("","", string.punctuation)
+    translator = str.maketrans("", "", string.punctuation)
     return text.translate(translator).lower()
+
 
 def tokenize(text: str, stopwords: set[str]) -> list[str]:
     tokens = normalize(text).split()
 
-    filtered = [
-        t for t in tokens
-        if t and len(t) >= 3 and t not in stopwords
-    ]
+    filtered = [t for t in tokens if t and len(t) >= 3 and t not in stopwords]
 
     stemmed = [stemmer.stem(t) for t in filtered]
 
     return stemmed
 
+
 def is_match(query: str, title: str, stopwords: set[str]) -> bool:
-    query_tokens = tokenize(query,stopwords)
+    query_tokens = tokenize(query, stopwords)
     title_tokens = tokenize(title, stopwords)
 
     for q in query_tokens:
@@ -32,9 +33,21 @@ def is_match(query: str, title: str, stopwords: set[str]) -> bool:
                 return True
     return False
 
-def load_stopwords()-> set[str]:
+
+def load_stopwords() -> set[str]:
     base_dir = Path(__file__).resolve().parent
     file_path = base_dir / "../data/stopwords.txt"
 
     with open(file_path, "r", encoding="utf-8") as f:
         return set(f.read().splitlines())
+
+
+def bm25_idf_command(term: str) -> float:
+
+    stopwords = load_stopwords()
+    stemmer = PorterStemmer()
+
+    index = InvertedIndex(stopwords, stemmer)
+    index.load()
+
+    return index.get_bm25_idf(term)

@@ -1,7 +1,7 @@
 import argparse
 import json
 from nltk.stem import PorterStemmer
-from helpers import is_match, load_stopwords
+from helpers import is_match, load_stopwords, bm25_idf_command
 from inverted_index import InvertedIndex
 import math
 
@@ -25,6 +25,11 @@ def main() -> None:
     tfidf_parser = subparsers.add_parser("tfidf", help="Calculate TF-IDF")
     tfidf_parser.add_argument("doc_id", type=int)
     tfidf_parser.add_argument("term", type=str)
+
+    bm25_idf_parser = subparsers.add_parser(
+        "bm25idf", help="Get BM25 IDF score for a given term"
+    )
+    bm25_idf_parser.add_argument("term", type=str)
 
     args = parser.parse_args()
 
@@ -146,6 +151,14 @@ def main() -> None:
             print(
                 f"TF-IDF score of '{args.term}' in document '{args.doc_id}': {tf_idf:.2f}"
             )
+        case "bm25idf":
+            try:
+                bm25idf = bm25_idf_command(args.term)
+            except FileNotFoundError as e:
+                print(str(e))
+                return
+
+            print(f"BM25 IDF score of '{args.term}': {bm25idf:.2f}")
         case _:
             parser.print_help()
 
