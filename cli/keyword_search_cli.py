@@ -3,6 +3,7 @@ import json
 from nltk.stem import PorterStemmer
 from helpers import is_match, load_stopwords
 from inverted_index import InvertedIndex
+import math
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -16,6 +17,8 @@ def main() -> None:
     tf_parser = subparsers.add_parser("tf", help="Get term frequency")
     tf_parser.add_argument("doc_id", type=int)
     tf_parser.add_argument("term", type=str)
+    idf_parser = subparsers.add_parser("idf", help="Calculate IDF")
+    idf_parser.add_argument("term", type=str)
 
     args = parser.parse_args()
 
@@ -81,6 +84,32 @@ def main() -> None:
             index.save()
 
             print("Index build and saved successfully.")
+        case "idf":
+            stopwords = load_stopwords()
+            stemmer = PorterStemmer()
+
+            index = InvertedIndex(stopwords, stemmer)
+
+            try:
+             index.load()
+            except FileNotFoundError as e:
+             print(str(e))
+             return
+
+            total_doc_count = len(index.docmap)
+
+            tokens = index._tokenize(args.term)
+
+            if len(tokens) != 1:
+                raise ValueError("Term must be a single token")
+
+            token = tokens[0]
+
+            term_match_doc_count = len(index.index.get(token, set()))
+
+            idf = math.log((total_doc_count + 1) / (term_match_doc_count + 1))
+
+            print(f"Inverse document frequency of '{args.term}': {idf:.2f}")
         case _:
             parser.print_help()
 
