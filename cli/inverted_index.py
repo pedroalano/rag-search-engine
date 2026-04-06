@@ -152,3 +152,17 @@ class InvertedIndex:
         norm = 1 - b + b * (doc_len / avg_doc_len)
 
         return (tf * (k1 + 1)) / (tf + k1 * norm)
+
+    def bm25(self, doc_id: int, term: str) -> float:
+        return self.get_bm25_tf(doc_id, term) * self.get_bm25_idf(term)
+
+    def bm25_search(self, query: str, limit: int = 5) -> list[tuple[int, float]]:
+        tokens = self._tokenize(query)
+        scores = {}
+        for doc_id in self.docmap:
+            total = 0.0
+            for token in tokens:
+                total += self.bm25(doc_id, token)
+            scores[doc_id] = total
+        sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        return sorted_docs[:limit]
