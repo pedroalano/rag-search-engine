@@ -5,6 +5,8 @@ import math
 
 
 class InvertedIndex:
+    BM25_K1 = 1.5
+
     def __init__(self, stopwords: set[str], stemmer):
         self.index: dict[str, set[int]] = {}
         self.docmap: dict[int, dict] = {}
@@ -108,3 +110,11 @@ class InvertedIndex:
         df = len(self.index.get(token, set()))  # docs com o termo
 
         return math.log((N - df + 0.5) / (df + 0.5) + 1)
+
+    def get_bm25_tf(self, doc_id: int, term: str, k1: float = BM25_K1) -> float:
+        tf = self.get_tf(doc_id, term)
+
+        if tf == 0:
+            return 0.0
+
+        return (tf * (k1 + 1)) / (tf + k1)
