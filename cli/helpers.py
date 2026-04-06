@@ -7,6 +7,8 @@ STOPWORDS = {"a", "an", "the", "of", "on", "in", "to", "and"}
 
 BM25_K1 = 1.5
 
+BM25_B = 0.75
+
 stemmer = PorterStemmer()
 
 
@@ -55,11 +57,11 @@ def bm25_idf_command(term: str) -> float:
     return index.get_bm25_idf(term)
 
 
-def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1) -> float:
+def bm25_tf_command(doc_id: int, term: str, k1: float, b: float) -> float:
     stopwords = load_stopwords()
     stemmer = PorterStemmer()
 
     index = InvertedIndex(stopwords, stemmer)
     index.load()
 
-    return index.get_bm25_tf(doc_id, term, k1)
+    return index.get_bm25_tf(doc_id, term, k1, b)

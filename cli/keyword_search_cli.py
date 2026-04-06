@@ -1,9 +1,16 @@
 import argparse
 import json
 from nltk.stem import PorterStemmer
-from helpers import BM25_K1, is_match, load_stopwords, bm25_idf_command, bm25_tf_command
+from helpers import (
+    load_stopwords,
+    bm25_idf_command,
+    bm25_tf_command,
+)
 from inverted_index import InvertedIndex
 import math
+
+BM25_K1 = 1.5
+BM25_B = 0.75
 
 
 def main() -> None:
@@ -37,6 +44,7 @@ def main() -> None:
     bm25_tf_parser.add_argument("doc_id", type=int)
     bm25_tf_parser.add_argument("term", type=str)
     bm25_tf_parser.add_argument("k1", type=float, nargs="?", default=BM25_K1)
+    bm25_tf_parser.add_argument("b", type=float, nargs="?", default=BM25_B)
 
     args = parser.parse_args()
 
@@ -168,7 +176,7 @@ def main() -> None:
             print(f"BM25 IDF score of '{args.term}': {bm25idf:.2f}")
         case "bm25tf":
             try:
-                bm25tf = bm25_tf_command(args.doc_id, args.term, args.k1)
+                bm25tf = bm25_tf_command(args.doc_id, args.term, args.k1, args.b)
             except FileNotFoundError as e:
                 print(str(e))
                 return
