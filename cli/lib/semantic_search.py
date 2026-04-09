@@ -5,6 +5,17 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 
+def cosine_similarity(vec1, vec2):
+    dot_product = np.dot(vec1, vec2)
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+
+    return dot_product / (norm1 * norm2)
+
+
 class SemanticSearch:
     def __init__(self):
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -38,6 +49,20 @@ class SemanticSearch:
             raise ValueError("Input text must not be empty or whitespace.")
         result = self.model.encode([text])
         return result[0]
+
+    def search(self, query, limit):
+        if self.embeddings is None:
+            raise ValueError("No embeddings loaded. Call `load_or_create_embeddings` first.")
+        query_embedding = self.generate_embedding(query)
+        scores = [
+            (cosine_similarity(query_embedding, self.embeddings[i]), self.documents[i])
+            for i in range(len(self.documents))
+        ]
+        scores.sort(key=lambda x: x[0], reverse=True)
+        return [
+            {"score": score, "title": doc["title"], "description": doc["description"]}
+            for score, doc in scores[:limit]
+        ]
 
 
 def verify_model():
