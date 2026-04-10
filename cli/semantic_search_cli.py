@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 from lib.semantic_search import SemanticSearch, verify_model, verify_embeddings, embed_text, embed_query_text
 
 
@@ -26,6 +27,11 @@ def main():
     chunk_parser.add_argument("text", type=str, help="Text to chunk")
     chunk_parser.add_argument("--chunk-size", type=int, default=200, help="Words per chunk (default 200)")
     chunk_parser.add_argument("--overlap", type=int, default=0, help="Words shared between consecutive chunks (default 0)")
+
+    semantic_chunk_parser = subparsers.add_parser("semantic_chunk", help="Split text into sentence-based chunks")
+    semantic_chunk_parser.add_argument("text", type=str, help="Text to chunk")
+    semantic_chunk_parser.add_argument("--max-chunk-size", type=int, default=4, help="Max sentences per chunk (default 4)")
+    semantic_chunk_parser.add_argument("--overlap", type=int, default=0, help="Sentences shared between consecutive chunks (default 0)")
 
     args = parser.parse_args()
 
@@ -57,6 +63,16 @@ def main():
                 chunks.append(" ".join(words[i:i + args.chunk_size]))
                 i += args.chunk_size - args.overlap
             print(f"Chunking {len(args.text)} characters")
+            for idx, chunk in enumerate(chunks, 1):
+                print(f"{idx}. {chunk}")
+        case "semantic_chunk":
+            sentences = re.split(r"(?<=[.!?])\s+", args.text)
+            chunks = []
+            i = 0
+            while i < len(sentences):
+                chunks.append(" ".join(sentences[i:i + args.max_chunk_size]))
+                i += args.max_chunk_size - args.overlap
+            print(f"Semantically chunking {len(args.text)} characters")
             for idx, chunk in enumerate(chunks, 1):
                 print(f"{idx}. {chunk}")
         case _:
