@@ -2,36 +2,80 @@ import argparse
 import json
 import os
 import re
-from lib.semantic_search import SemanticSearch, verify_model, verify_embeddings, embed_text, embed_query_text
+from lib.semantic_search import (
+    SemanticSearch,
+    ChunkedSemanticSearch,
+    verify_model,
+    verify_embeddings,
+    embed_text,
+    embed_query_text,
+)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Semantic Search CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    subparsers.add_parser("verify", help="Verify the embedding model is loaded correctly")
+    subparsers.add_parser(
+        "verify", help="Verify the embedding model is loaded correctly"
+    )
 
-    subparsers.add_parser("verify_embeddings", help="Build or verify movie embeddings cache")
+    subparsers.add_parser(
+        "verify_embeddings", help="Build or verify movie embeddings cache"
+    )
 
-    embed_text_parser = subparsers.add_parser("embed_text", help="Generate embedding for a text input")
+    embed_text_parser = subparsers.add_parser(
+        "embed_text", help="Generate embedding for a text input"
+    )
     embed_text_parser.add_argument("text", type=str, help="Text to embed")
 
-    embed_query_parser = subparsers.add_parser("embedquery", help="Generate embedding for a query string")
+    embed_query_parser = subparsers.add_parser(
+        "embedquery", help="Generate embedding for a query string"
+    )
     embed_query_parser.add_argument("query", type=str, help="Query to embed")
 
-    search_parser = subparsers.add_parser("search", help="Search movies by semantic similarity")
+    search_parser = subparsers.add_parser(
+        "search", help="Search movies by semantic similarity"
+    )
     search_parser.add_argument("query", type=str, help="Query string")
-    search_parser.add_argument("--limit", type=int, default=5, help="Number of results (default 5)")
+    search_parser.add_argument(
+        "--limit", type=int, default=5, help="Number of results (default 5)"
+    )
 
-    chunk_parser = subparsers.add_parser("chunk", help="Split text into fixed-size word chunks")
+    chunk_parser = subparsers.add_parser(
+        "chunk", help="Split text into fixed-size word chunks"
+    )
     chunk_parser.add_argument("text", type=str, help="Text to chunk")
-    chunk_parser.add_argument("--chunk-size", type=int, default=200, help="Words per chunk (default 200)")
-    chunk_parser.add_argument("--overlap", type=int, default=0, help="Words shared between consecutive chunks (default 0)")
+    chunk_parser.add_argument(
+        "--chunk-size", type=int, default=200, help="Words per chunk (default 200)"
+    )
+    chunk_parser.add_argument(
+        "--overlap",
+        type=int,
+        default=0,
+        help="Words shared between consecutive chunks (default 0)",
+    )
 
-    semantic_chunk_parser = subparsers.add_parser("semantic_chunk", help="Split text into sentence-based chunks")
+    semantic_chunk_parser = subparsers.add_parser(
+        "semantic_chunk", help="Split text into sentence-based chunks"
+    )
     semantic_chunk_parser.add_argument("text", type=str, help="Text to chunk")
-    semantic_chunk_parser.add_argument("--max-chunk-size", type=int, default=4, help="Max sentences per chunk (default 4)")
-    semantic_chunk_parser.add_argument("--overlap", type=int, default=0, help="Sentences shared between consecutive chunks (default 0)")
+    semantic_chunk_parser.add_argument(
+        "--max-chunk-size",
+        type=int,
+        default=4,
+        help="Max sentences per chunk (default 4)",
+    )
+    semantic_chunk_parser.add_argument(
+        "--overlap",
+        type=int,
+        default=0,
+        help="Sentences shared between consecutive chunks (default 0)",
+    )
+
+    subparsers.add_parser(
+        "embed_chunks", help="Build or load chunk embeddings for all movies"
+    )
 
     args = parser.parse_args()
 
@@ -60,7 +104,7 @@ def main():
             chunks = []
             i = 0
             while i < len(words):
-                chunks.append(" ".join(words[i:i + args.chunk_size]))
+                chunks.append(" ".join(words[i : i + args.chunk_size]))
                 i += args.chunk_size - args.overlap
             print(f"Chunking {len(args.text)} characters")
             for idx, chunk in enumerate(chunks, 1):
@@ -70,11 +114,18 @@ def main():
             chunks = []
             i = 0
             while i < len(sentences):
-                chunks.append(" ".join(sentences[i:i + args.max_chunk_size]))
+                chunks.append(" ".join(sentences[i : i + args.max_chunk_size]))
                 i += args.max_chunk_size - args.overlap
             print(f"Semantically chunking {len(args.text)} characters")
             for idx, chunk in enumerate(chunks, 1):
                 print(f"{idx}. {chunk}")
+        case "embed_chunks":
+            data_path = os.path.join(os.path.dirname(__file__), "../data/movies.json")
+            with open(data_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            css = ChunkedSemanticSearch()
+            embeddings = css.load_or_create_chunk_embeddings(data["movies"])
+            print(f"Generated {len(embeddings)} chunked embeddings")
         case _:
             parser.print_help()
 
