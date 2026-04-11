@@ -3,6 +3,7 @@ import json
 import os
 import re
 from lib.semantic_search import (
+    SCORE_PRECISION,
     SemanticSearch,
     ChunkedSemanticSearch,
     verify_model,
@@ -10,6 +11,12 @@ from lib.semantic_search import (
     embed_text,
     embed_query_text,
 )
+
+
+def load_movies():
+    data_path = os.path.join(os.path.dirname(__file__), "../data/movies.json")
+    with open(data_path, "r", encoding="utf-8") as f:
+        return json.load(f)["movies"]
 
 
 def main():
@@ -77,6 +84,14 @@ def main():
         "embed_chunks", help="Build or load chunk embeddings for all movies"
     )
 
+    search_chunked_parser = subparsers.add_parser(
+        "search_chunked", help="Search movies using chunk embeddings"
+    )
+    search_chunked_parser.add_argument("query", type=str, help="Query string")
+    search_chunked_parser.add_argument(
+        "--limit", type=int, default=5, help="Number of results (default 5)"
+    )
+
     args = parser.parse_args()
 
     match args.command:
@@ -120,12 +135,17 @@ def main():
             for idx, chunk in enumerate(chunks, 1):
                 print(f"{idx}. {chunk}")
         case "embed_chunks":
-            data_path = os.path.join(os.path.dirname(__file__), "../data/movies.json")
-            with open(data_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
             css = ChunkedSemanticSearch()
-            embeddings = css.load_or_create_chunk_embeddings(data["movies"])
+            embeddings = css.load_or_create_chunk_embeddings(load_movies())
             print(f"Generated {len(embeddings)} chunked embeddings")
+        case "search_chunked":
+            movies = load_movies()
+            css = ChunkedSemanticSearch()
+            css.load_or_create_chunk_embeddings(movies)
+            results = css.search_chunks(args.query, args.limit)
+            for i, result in enumerate(results, 1):
+                print(f"\n{i}. {result['title']} (score: {result['score']:.4f})")
+                print(f"   {result['document']}...")
         case _:
             parser.print_help()
 
