@@ -20,7 +20,13 @@ def cosine_similarity(vec1, vec2):
 
 
 def semantic_chunk(text, max_chunk_size=4, overlap=1):
+    text = text.strip()
+    if not text:
+        return []
     sentences = re.split(r"(?<=[.!?])\s+", text)
+    if len(sentences) == 1 and not re.search(r"[.!?]$", sentences[0]):
+        sentences = [text]
+    sentences = [s.strip() for s in sentences if s.strip()]
     chunks = []
     i = 0
     while i < len(sentences):

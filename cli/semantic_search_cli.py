@@ -1,11 +1,11 @@
 import argparse
 import json
 import os
-import re
 from lib.semantic_search import (
     SCORE_PRECISION,
     SemanticSearch,
     ChunkedSemanticSearch,
+    semantic_chunk,
     verify_model,
     verify_embeddings,
     embed_text,
@@ -125,12 +125,7 @@ def main():
             for idx, chunk in enumerate(chunks, 1):
                 print(f"{idx}. {chunk}")
         case "semantic_chunk":
-            sentences = re.split(r"(?<=[.!?])\s+", args.text)
-            chunks = []
-            i = 0
-            while i < len(sentences):
-                chunks.append(" ".join(sentences[i : i + args.max_chunk_size]))
-                i += args.max_chunk_size - args.overlap
+            chunks = semantic_chunk(args.text, args.max_chunk_size, args.overlap)
             print(f"Semantically chunking {len(args.text)} characters")
             for idx, chunk in enumerate(chunks, 1):
                 print(f"{idx}. {chunk}")
