@@ -77,4 +77,37 @@ class HybridSearch:
         return sorted(combined.values(), key=lambda x: x["hybrid_score"], reverse=True)
 
     def rrf_search(self, query, k, limit=10):
-        raise NotImplementedError("RRF hybrid search is not implemented yet.")
+        fetch = limit * 500
+
+        bm25_raw = self._bm25_search(query, fetch)
+        semantic_raw = self.semantic_search.search_chunks(query, fetch)
+
+        combined = {}
+
+        for rank, (doc_id, _) in enumerate(bm25_raw, 1):
+            doc = self.idx.docmap[doc_id]
+            combined[doc_id] = {
+                "id": doc_id,
+                "title": doc["title"],
+                "document": doc["description"][:100],
+                "bm25_rank": rank,
+                "semantic_rank": None,
+                "rrf_score": 1 / (k + rank),
+            }
+
+        for rank, result in enumerate(semantic_raw, 1):
+            doc_id = result["id"]
+            if doc_id in combined:
+                combined[doc_id]["semantic_rank"] = rank
+                combined[doc_id]["rrf_score"] += 1 / (k + rank)
+            else:
+                combined[doc_id] = {
+                    "id": doc_id,
+                    "title": result["title"],
+                    "document": result["document"],
+                    "bm25_rank": None,
+                    "semantic_rank": rank,
+                    "rrf_score": 1 / (k + rank),
+                }
+
+        return sorted(combined.values(), key=lambda x: x["rrf_score"], reverse=True)
