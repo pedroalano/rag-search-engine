@@ -56,6 +56,30 @@ User query: "{query}"
     return response.text.strip()
 
 
+def expand_query(query: str) -> str:
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY environment variable not set")
+    client = genai.Client(api_key=api_key)
+    prompt = f"""Expand the user-provided movie search query below with related terms.
+
+Add synonyms and related concepts that might appear in movie descriptions.
+Keep expansions relevant and focused.
+Output only the additional terms; they will be appended to the original query.
+
+Examples:
+- "scary bear movie" -> "scary horror grizzly bear movie terrifying film"
+- "action movie with bear" -> "action thriller bear chase fight adventure"
+- "comedy with bear" -> "comedy funny bear humor lighthearted"
+
+User query: "{query}"
+"""
+    response = client.models.generate_content(model="gemma-3-27b-it", contents=prompt)
+    additional = response.text.strip()
+    return f"{query} {additional}"
+
+
 def load_movies():
     data_path = os.path.join(os.path.dirname(__file__), "../data/movies.json")
     with open(data_path, "r", encoding="utf-8") as f:
@@ -78,7 +102,7 @@ def main() -> None:
     rrf_parser.add_argument(
         "--enhance",
         type=str,
-        choices=["spell", "rewrite"],
+        choices=["spell", "rewrite", "expand"],
         help="Query enhancement method",
     )
 
@@ -109,6 +133,8 @@ def main() -> None:
                 enhanced = spell_correct(query)
             elif args.enhance == "rewrite":
                 enhanced = rewrite_query(query)
+            elif args.enhance == "expand":
+                enhanced = expand_query(query)
             else:
                 enhanced = query
             if enhanced != query:
