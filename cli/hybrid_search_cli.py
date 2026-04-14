@@ -3,8 +3,28 @@ import json
 import os
 import sys
 
+from dotenv import load_dotenv
+from google import genai
+
 sys.path.insert(0, os.path.dirname(__file__))
 from lib.hybrid_search import HybridSearch
+
+
+def spell_correct(query: str) -> str:
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY environment variable not set")
+    client = genai.Client(api_key=api_key)
+    prompt = f"""Fix any spelling errors in the user-provided movie search query below.
+Correct only clear, high-confidence typos. Do not rewrite, add, remove, or reorder words.
+Preserve punctuation and capitalization unless a change is required for a typo fix.
+If there are no spelling errors, or if you're unsure, output the original query unchanged.
+Output only the final query text, nothing else.
+User query: "{query}"
+"""
+    response = client.models.generate_content(model="gemma-3-27b-it", contents=prompt)
+    return response.text.strip()
 
 
 def load_movies():
@@ -26,6 +46,12 @@ def main() -> None:
     rrf_parser.add_argument("query", type=str, help="Search query")
     rrf_parser.add_argument("-k", type=int, default=60, help="RRF constant (default 60)")
     rrf_parser.add_argument("--limit", type=int, default=5, help="Number of results (default 5)")
+    rrf_parser.add_argument(
+        "--enhance",
+        type=str,
+        choices=["spell"],
+        help="Query enhancement method",
+    )
 
     normalize_parser = subparsers.add_parser(
         "normalize", help="Min-max normalize a list of scores"
@@ -49,7 +75,13 @@ def main() -> None:
         case "rrf-search":
             movies = load_movies()
             hs = HybridSearch(movies)
-            results = hs.rrf_search(args.query, args.k, args.limit)
+            query = args.query
+            if args.enhance == "spell":
+                enhanced = spell_correct(query)
+                if enhanced != query:
+                    print(f"Enhanced query (spell): '{query}' -> '{enhanced}'\n")
+                query = enhanced
+            results = hs.rrf_search(query, args.k, args.limit)
             for i, r in enumerate(results[:args.limit], 1):
                 print(f"{i}. {r['title']}")
                 print(f"  RRF Score: {r['rrf_score']:.3f}")
