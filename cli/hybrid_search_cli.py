@@ -132,6 +132,43 @@ Score:"""
     return sorted(results, key=lambda r: r["llm_score"], reverse=True)[:limit]
 
 
+def rerank_batch(results: list, query: str, limit: int) -> list:
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY environment variable not set")
+    client = genai.Client(api_key=api_key)
+    print(f"Re-ranking top {len(results)} results using batch method...")
+    doc_list_str = "\n".join(
+        f"{doc['id']}. {doc.get('title', '')} - {doc.get('document', '')}"
+        for doc in results
+    )
+    prompt = f"""Rank the movies listed below by relevance to the following search query.
+
+Query: "{query}"
+
+Movies:
+{doc_list_str}
+
+Return ONLY the movie IDs in order of relevance (best match first). Return a valid JSON list, nothing else.
+
+For example:
+[75, 12, 34, 2, 1]
+
+Ranking:"""
+    response = client.models.generate_content(model="gemma-3-27b-it", contents=prompt)
+    ranked_ids = json.loads(response.text.strip())
+    id_to_rank = {doc_id: rank + 1 for rank, doc_id in enumerate(ranked_ids)}
+    id_to_doc = {doc["id"]: doc for doc in results}
+    reranked = []
+    for doc_id in ranked_ids:
+        if doc_id in id_to_doc:
+            doc = id_to_doc[doc_id]
+            doc["llm_rank"] = id_to_rank[doc_id]
+            reranked.append(doc)
+    return reranked[:limit]
+
+
 def load_movies():
     data_path = os.path.join(os.path.dirname(__file__), "../data/movies.json")
     with open(data_path, "r", encoding="utf-8") as f:
@@ -168,7 +205,7 @@ def main() -> None:
     rrf_parser.add_argument(
         "--rerank-method",
         type=str,
-        choices=["individual"],
+        choices=["individual", "batch"],
         help="Re-ranking method to apply after RRF search",
     )
 
@@ -216,6 +253,17 @@ def main() -> None:
                 for i, r in enumerate(results, 1):
                     print(f"{i}. {r['title']}")
                     print(f"   Re-rank Score: {r['llm_score']:.3f}/10")
+                    print(f"   RRF Score: {r['rrf_score']:.3f}")
+                    print(
+                        f"   BM25 Rank: {r['bm25_rank']}, Semantic Rank: {r['semantic_rank']}"
+                    )
+                    print(f"   {r['document']}...")
+            elif args.rerank_method == "batch":
+                results = rerank_batch(results[:fetch], query, args.limit)
+                print(f"\nReciprocal Rank Fusion Results for '{query}' (k={args.k}):\n")
+                for i, r in enumerate(results, 1):
+                    print(f"{i}. {r['title']}")
+                    print(f"   Re-rank Rank: {r['llm_rank']}")
                     print(f"   RRF Score: {r['rrf_score']:.3f}")
                     print(
                         f"   BM25 Rank: {r['bm25_rank']}, Semantic Rank: {r['semantic_rank']}"
