@@ -211,7 +211,7 @@ def main() -> None:
             fetch = args.limit * 5 if args.rerank_method else args.limit
             results = hs.rrf_search(query, args.k, fetch)
             if args.rerank_method == "individual":
-                results = rerank_individual(results, query, args.limit)
+                results = rerank_individual(results[:fetch], query, args.limit)
                 print(f"\nReciprocal Rank Fusion Results for '{query}' (k={args.k}):\n")
                 for i, r in enumerate(results, 1):
                     print(f"{i}. {r['title']}")
