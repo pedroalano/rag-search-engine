@@ -7,6 +7,7 @@ import time
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from sentence_transformers import CrossEncoder
 
 sys.path.insert(0, os.path.dirname(__file__))
 from lib.hybrid_search import HybridSearch
@@ -169,6 +170,18 @@ Ranking:"""
     return reranked[:limit]
 
 
+def rerank_cross_encoder(results: list, query: str, limit: int) -> list:
+    print(f"Re-ranking top {len(results)} results using cross_encoder method...")
+    pairs = []
+    for doc in results:
+        pairs.append([query, f"{doc.get('title', '')} - {doc.get('document', '')}"])
+    cross_encoder = CrossEncoder("cross-encoder/ms-marco-TinyBERT-L2-v2")
+    scores = cross_encoder.predict(pairs)
+    for doc, score in zip(results, scores):
+        doc["cross_encoder_score"] = float(score)
+    return sorted(results, key=lambda r: r["cross_encoder_score"], reverse=True)[:limit]
+
+
 def load_movies():
     data_path = os.path.join(os.path.dirname(__file__), "../data/movies.json")
     with open(data_path, "r", encoding="utf-8") as f:
@@ -205,7 +218,7 @@ def main() -> None:
     rrf_parser.add_argument(
         "--rerank-method",
         type=str,
-        choices=["individual", "batch"],
+        choices=["individual", "batch", "cross_encoder"],
         help="Re-ranking method to apply after RRF search",
     )
 
@@ -264,6 +277,17 @@ def main() -> None:
                 for i, r in enumerate(results, 1):
                     print(f"{i}. {r['title']}")
                     print(f"   Re-rank Rank: {r['llm_rank']}")
+                    print(f"   RRF Score: {r['rrf_score']:.3f}")
+                    print(
+                        f"   BM25 Rank: {r['bm25_rank']}, Semantic Rank: {r['semantic_rank']}"
+                    )
+                    print(f"   {r['document']}...")
+            elif args.rerank_method == "cross_encoder":
+                results = rerank_cross_encoder(results[:fetch], query, args.limit)
+                print(f"\nReciprocal Rank Fusion Results for '{query}' (k={args.k}):\n")
+                for i, r in enumerate(results, 1):
+                    print(f"{i}. {r['title']}")
+                    print(f"   Cross Encoder Score: {r['cross_encoder_score']:.3f}")
                     print(f"   RRF Score: {r['rrf_score']:.3f}")
                     print(
                         f"   BM25 Rank: {r['bm25_rank']}, Semantic Rank: {r['semantic_rank']}"
