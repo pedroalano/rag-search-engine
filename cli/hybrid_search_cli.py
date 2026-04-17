@@ -221,6 +221,9 @@ def main() -> None:
         choices=["individual", "batch", "cross_encoder"],
         help="Re-ranking method to apply after RRF search",
     )
+    rrf_parser.add_argument(
+        "--debug", action="store_true", help="Enable debug logging"
+    )
 
     normalize_parser = subparsers.add_parser(
         "normalize", help="Min-max normalize a list of scores"
@@ -247,6 +250,8 @@ def main() -> None:
             movies = load_movies()
             hs = HybridSearch(movies)
             query = args.query
+            if args.debug:
+                print(f"[DEBUG] Original query: '{query}'")
             if args.enhance == "spell":
                 enhanced = spell_correct(query)
             elif args.enhance == "rewrite":
@@ -257,11 +262,24 @@ def main() -> None:
                 enhanced = query
             if enhanced != query:
                 print(f"Enhanced query ({args.enhance}): '{query}' -> '{enhanced}'\n")
+            if args.debug:
+                if enhanced != query:
+                    print(f"[DEBUG] Enhanced query ({args.enhance}): '{enhanced}'")
+                else:
+                    print(f"[DEBUG] No query enhancement applied")
             query = enhanced
             fetch = args.limit * 5 if args.rerank_method else args.limit
             results = hs.rrf_search(query, args.k, fetch)
+            if args.debug:
+                print(f"[DEBUG] RRF search returned {len(results)} results:")
+                for i, r in enumerate(results[:fetch], 1):
+                    print(f"[DEBUG]   {i}. {r['title']} (score: {r['rrf_score']:.4f}, bm25_rank: {r['bm25_rank']}, semantic_rank: {r['semantic_rank']})")
             if args.rerank_method == "individual":
                 results = rerank_individual(results[:fetch], query, args.limit)
+                if args.debug:
+                    print(f"[DEBUG] Re-ranked results (individual):")
+                    for i, r in enumerate(results, 1):
+                        print(f"[DEBUG]   {i}. {r['title']} (llm_score: {r['llm_score']:.3f})")
                 print(f"\nReciprocal Rank Fusion Results for '{query}' (k={args.k}):\n")
                 for i, r in enumerate(results, 1):
                     print(f"{i}. {r['title']}")
@@ -273,6 +291,10 @@ def main() -> None:
                     print(f"   {r['document']}...")
             elif args.rerank_method == "batch":
                 results = rerank_batch(results[:fetch], query, args.limit)
+                if args.debug:
+                    print(f"[DEBUG] Re-ranked results (batch):")
+                    for i, r in enumerate(results, 1):
+                        print(f"[DEBUG]   {i}. {r['title']} (llm_rank: {r['llm_rank']})")
                 print(f"\nReciprocal Rank Fusion Results for '{query}' (k={args.k}):\n")
                 for i, r in enumerate(results, 1):
                     print(f"{i}. {r['title']}")
@@ -284,6 +306,10 @@ def main() -> None:
                     print(f"   {r['document']}...")
             elif args.rerank_method == "cross_encoder":
                 results = rerank_cross_encoder(results[:fetch], query, args.limit)
+                if args.debug:
+                    print(f"[DEBUG] Re-ranked results (cross_encoder):")
+                    for i, r in enumerate(results, 1):
+                        print(f"[DEBUG]   {i}. {r['title']} (cross_encoder_score: {r['cross_encoder_score']:.3f})")
                 print(f"\nReciprocal Rank Fusion Results for '{query}' (k={args.k}):\n")
                 for i, r in enumerate(results, 1):
                     print(f"{i}. {r['title']}")
