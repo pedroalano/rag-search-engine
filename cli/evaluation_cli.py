@@ -43,8 +43,10 @@ def main():
         retrieved_titles = [r["title"] for r in results]
         hits = sum(1 for t in retrieved_titles if t in relevant)
         precision = hits / limit if limit > 0 else 0.0
+        recall = hits / len(relevant) if len(relevant) > 0 else 0.0
         print(f"- Query: {query}")
         print(f"  - Precision@{limit}: {precision:.4f}")
+        print(f"  - Recall@{limit}: {recall:.4f}")
         print(f"  - Retrieved: {', '.join(retrieved_titles)}")
         print(f"  - Relevant: {', '.join(tc['relevant_docs'])}")
         print()
