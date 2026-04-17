@@ -182,6 +182,62 @@ def rerank_cross_encoder(results: list, query: str, limit: int) -> list:
     return sorted(results, key=lambda r: r["cross_encoder_score"], reverse=True)[:limit]
 
 
+def evaluate_results(results: list, query: str) -> None:
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY environment variable not set")
+    client = genai.Client(api_key=api_key)
+    config = types.GenerateContentConfig(
+        safety_settings=[
+            types.SafetySetting(
+                category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"
+            ),
+            types.SafetySetting(
+                category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"
+            ),
+            types.SafetySetting(
+                category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"
+            ),
+            types.SafetySetting(
+                category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"
+            ),
+        ]
+    )
+    formatted_results = [
+        f"{i}. {r['title']} - {r['document']}" for i, r in enumerate(results, 1)
+    ]
+    prompt = f"""Rate how relevant each result is to this query on a 0-3 scale:
+
+Query: "{query}"
+
+Results:
+{chr(10).join(formatted_results)}
+
+Scale:
+- 3: Highly relevant
+- 2: Relevant
+- 1: Marginally relevant
+- 0: Not relevant
+
+Do NOT give any numbers other than 0, 1, 2, or 3.
+
+Return ONLY the scores in the same order you were given the documents. Return a valid JSON list, nothing else. For example:
+
+[2, 0, 3, 2, 0, 1]"""
+    response = client.models.generate_content(
+        model="gemma-3-27b-it", contents=prompt, config=config
+    )
+    try:
+        scores = json.loads(response.text.strip())
+    except (json.JSONDecodeError, AttributeError):
+        print("Failed to parse evaluation response")
+        return
+    print(f"\nEvaluation Results:\n")
+    for i, (r, score) in enumerate(zip(results, scores), 1):
+        print(f"{i}. {r['title']}: {score}/3")
+
+
 def load_movies():
     data_path = os.path.join(os.path.dirname(__file__), "../data/movies.json")
     with open(data_path, "r", encoding="utf-8") as f:
@@ -223,6 +279,9 @@ def main() -> None:
     )
     rrf_parser.add_argument(
         "--debug", action="store_true", help="Enable debug logging"
+    )
+    rrf_parser.add_argument(
+        "--evaluate", action="store_true", help="Evaluate results with LLM"
     )
 
     normalize_parser = subparsers.add_parser(
@@ -320,13 +379,16 @@ def main() -> None:
                     )
                     print(f"   {r['document']}...")
             else:
-                for i, r in enumerate(results[: args.limit], 1):
+                results = results[: args.limit]
+                for i, r in enumerate(results, 1):
                     print(f"{i}. {r['title']}")
                     print(f"  RRF Score: {r['rrf_score']:.3f}")
                     print(
                         f"  BM25 Rank: {r['bm25_rank']}, Semantic Rank: {r['semantic_rank']}"
                     )
                     print(f"  {r['document']}...")
+            if args.evaluate:
+                evaluate_results(results, query)
         case "normalize":
             scores = args.scores
             if not scores:
