@@ -55,8 +55,10 @@ def summarize_search(query, limit):
     hs = HybridSearch(movies)
     results = hs.rrf_search(query, k=60, limit=limit)[:limit]
 
+    movies_by_id = {m["id"]: m for m in movies}
     results_str = "\n".join(
-        f"- Title: {r['title']}\n  Description: {r['document']}" for r in results
+        f"- Title: {r['title']}\n  Description: {movies_by_id[r['id']]['description']}"
+        for r in results
     )
 
     prompt = f"""Provide information useful to the query below by synthesizing data from multiple search results in detail.
@@ -92,8 +94,9 @@ def citations_search(query, limit):
     hs = HybridSearch(movies)
     results = hs.rrf_search(query, k=60, limit=limit)[:limit]
 
+    movies_by_id = {m["id"]: m for m in movies}
     documents = "\n".join(
-        f"[{i + 1}] Title: {r['title']}\n    Description: {r['document']}"
+        f"[{i + 1}] Title: {r['title']}\n    Description: {movies_by_id[r['id']]['description']}"
         for i, r in enumerate(results)
     )
 
@@ -130,6 +133,46 @@ Answer:"""
     print(f"\nLLM Answer:\n{response.text}")
 
 
+def question_answer(question, limit):
+    movies = load_movies()
+    hs = HybridSearch(movies)
+    results = hs.rrf_search(question, k=60, limit=limit)[:limit]
+
+    movies_by_id = {m["id"]: m for m in movies}
+    context = "\n".join(
+        f"- Title: {r['title']}\n  Description: {movies_by_id[r['id']]['description']}"
+        for r in results
+    )
+
+    prompt = f"""Answer the user's question based on the provided movies that are available on Hoopla, a streaming service.
+
+Question: {question}
+
+Documents:
+{context}
+
+Instructions:
+- Answer questions directly and concisely
+- Be casual and conversational
+- Don't be cringe or hype-y
+- Talk like a normal person would in a chat conversation
+
+Answer:"""
+
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY environment variable not set")
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(model="gemma-3-27b-it", contents=prompt)
+
+    print("Search Results:")
+    for r in results:
+        print(f"  - {r['title']}")
+
+    print(f"\nAnswer:\n{response.text}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Retrieval Augmented Generation CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -155,6 +198,16 @@ def main():
         "--limit", type=int, default=5, help="Number of results to use"
     )
 
+    question_parser = subparsers.add_parser(
+        "question", help="Ask a conversational question"
+    )
+    question_parser.add_argument(
+        "question", type=str, help="Question to answer"
+    )
+    question_parser.add_argument(
+        "--limit", type=int, default=5, help="Number of results to use"
+    )
+
     args = parser.parse_args()
 
     match args.command:
@@ -164,6 +217,8 @@ def main():
             summarize_search(args.query, args.limit)
         case "citations":
             citations_search(args.query, args.limit)
+        case "question":
+            question_answer(args.question, args.limit)
         case _:
             parser.print_help()
 
