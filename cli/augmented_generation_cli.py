@@ -87,6 +87,49 @@ Provide a comprehensive 3–4 sentence answer that combines information from mul
     print(f"\nLLM Summary:\n{response.text}")
 
 
+def citations_search(query, limit):
+    movies = load_movies()
+    hs = HybridSearch(movies)
+    results = hs.rrf_search(query, k=60, limit=limit)[:limit]
+
+    documents = "\n".join(
+        f"[{i + 1}] Title: {r['title']}\n    Description: {r['document']}"
+        for i, r in enumerate(results)
+    )
+
+    prompt = f"""Answer the query below and give information based on the provided documents.
+
+The answer should be tailored to users of Hoopla, a movie streaming service.
+If not enough information is available to provide a good answer, say so, but give the best answer possible while citing the sources available.
+
+Query: {query}
+
+Documents:
+{documents}
+
+Instructions:
+- Provide a comprehensive answer that addresses the query
+- Cite sources in the format [1], [2], etc. when referencing information
+- If sources disagree, mention the different viewpoints
+- If the answer isn't in the provided documents, say "I don't have enough information"
+- Be direct and informative
+
+Answer:"""
+
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY environment variable not set")
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(model="gemma-3-27b-it", contents=prompt)
+
+    print("Search Results:")
+    for r in results:
+        print(f"  - {r['title']}")
+
+    print(f"\nLLM Answer:\n{response.text}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Retrieval Augmented Generation CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -104,6 +147,14 @@ def main():
         "--limit", type=int, default=5, help="Number of results to summarize"
     )
 
+    citations_parser = subparsers.add_parser(
+        "citations", help="Answer query with source citations"
+    )
+    citations_parser.add_argument("query", type=str, help="Search query to answer")
+    citations_parser.add_argument(
+        "--limit", type=int, default=5, help="Number of results to use"
+    )
+
     args = parser.parse_args()
 
     match args.command:
@@ -111,6 +162,8 @@ def main():
             rag_search(args.query)
         case "summarize":
             summarize_search(args.query, args.limit)
+        case "citations":
+            citations_search(args.query, args.limit)
         case _:
             parser.print_help()
 
